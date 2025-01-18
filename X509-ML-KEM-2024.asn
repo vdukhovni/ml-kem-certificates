@@ -66,26 +66,20 @@ PublicKeys PUBLIC-KEY ::= {
 
 pk-ml-kem-512 PUBLIC-KEY ::= {
   IDENTIFIER id-alg-ml-kem-512
-  -- KEY no ASN.1 wrapping --
   PARAMS ARE absent
   CERT-KEY-USAGE { keyEncipherment }
-  --- PRIVATE-KEY no ASN.1 wrapping --
   }
 
 pk-ml-kem-768 PUBLIC-KEY ::= {
   IDENTIFIER id-alg-ml-kem-768
-  -- KEY no ASN.1 wrapping --
   PARAMS ARE absent
   CERT-KEY-USAGE { keyEncipherment }
-  --- PRIVATE-KEY no ASN.1 wrapping --
   }
 
 pk-ml-kem-1024 PUBLIC-KEY ::= {
   IDENTIFIER id-alg-ml-kem-1024
-  -- KEY no ASN.1 wrapping --
   PARAMS ARE absent
   CERT-KEY-USAGE { keyEncipherment }
-  --- PRIVATE-KEY no ASN.1 wrapping --
   }
 
 END

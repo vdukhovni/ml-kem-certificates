@@ -5,7 +5,7 @@ title: >
 abbrev: ML-KEM in Certificates
 category: std
 
-docname: draft-ietf-lamps-kyber-certificates-latest
+docname: draft-dukhovni-kyber-certificates-latest
 submissiontype: IETF
 number:
 date:
@@ -25,29 +25,15 @@ venue:
   type: "Working Group"
   mail: "spasm@ietf.org"
   arch: "https://mailarchive.ietf.org/arch/browse/spasm/"
-  github: "lamps-wg/kyber-certificates"
-  latest: "https://lamps-wg.github.io/kyber-certificates/#go.draft-ietf-lamps-kyber-certificates.html"
+[//]: # github: "lamps-wg/kyber-certificates"
+[//]: # "https://lamps-wg.github.io/kyber-certificates/#go.draft-ietf-lamps-kyber-certificates.html"
 
 author:
  -
-    name: Sean Turner
-    organization: sn3rd
-    email: sean@sn3rd.com
- -
-    ins: P. Kampanakis
-    name: Panos Kampanakis
-    org: AWS
-    email: kpanos@amazon.com
- -
-    ins: J. Massimo
-    name: Jake Massimo
-    organization: AWS
-    email: jakemas@amazon.com
- -
-    ins: B. Westerbaan
-    name: Bas Westerbaan
-    organization: Cloudflare
-    email: bas@westerbaan.name
+    name: Viktor Dukhovni
+    organization: OpenSSL
+    email: viktor@openssl.org
+[//]: # - Insert other authors here
 
 normative:
   X680:
@@ -75,38 +61,13 @@ normative:
       ISO/IEC: 8825-1:2021
 
 informative:
-  CDM23:
-    title: "Keeping Up with the KEMs: Stronger Security Notions for KEMs and automated analysis of KEM-based protocols"
-    target: https://eprint.iacr.org/2023/1933.pdf
-    date: 2023
-    author:
-      -
-        ins: C. Cremers
-        name: Cas Cremers
-        org: CISPA Helmholtz Center for Information Security
-      -
-        ins: A. Dax
-        name: Alexander Dax
-        org: CISPA Helmholtz Center for Information Security
-      -
-        ins: N. Medinger
-        name: Niklas Medinger
-        org: CISPA Helmholtz Center for Information Security
-  KEMMY24:
-    title: "Unbindable Kemmy Schmidt: ML-KEM is neither MAL-BIND-K-CT nor MAL-BIND-K-PK"
-    target: https://eprint.iacr.org/2024/523.pdf
-    date: 2024
-    author:
-      -
-        ins: S. Schmieg
-        name: Sophie Schmieg
   NIST-PQC:
-    target: https://csrc.nist.gov/projects/post-quantum-cryptography
+    target: https://csrc.nist.gov/pubs/fips/203/final
     title: >
-      Post-Quantum Cryptography Project
+      Module-Lattice-Based Key-Encapsulation Mechanism Standard
     author:
     - org: National Institute of Standards and Technology (NIST)
-    date: 2016-12-20
+    date: 2024-08-13
 
 --- abstract
 
@@ -195,42 +156,40 @@ certificate extension MUST only contain keyEncipherment
 
   pk-ml-kem-512 PUBLIC-KEY ::= {
     IDENTIFIER id-alg-ml-kem-512
-    -- KEY no ASN.1 wrapping --
     PARAMS ARE absent
     CERT-KEY-USAGE { keyEncipherment }
-    --- PRIVATE-KEY no ASN.1 wrapping --
     }
 
   pk-ml-kem-768 PUBLIC-KEY ::= {
     IDENTIFIER id-alg-ml-kem-768
-    -- KEY no ASN.1 wrapping --
     PARAMS ARE absent
     CERT-KEY-USAGE { keyEncipherment }
-    --- PRIVATE-KEY no ASN.1 wrapping --
     }
 
   pk-ml-kem-1024 PUBLIC-KEY ::= {
     IDENTIFIER id-alg-ml-kem-1024
-    -- KEY no ASN.1 wrapping --
     PARAMS ARE absent
     CERT-KEY-USAGE { keyEncipherment }
-    --- PRIVATE-KEY no ASN.1 wrapping --
     }
 
   ML-KEM-PublicKey ::= OCTET STRING (SIZE (800 | 1184 | 1568))
 
-  ML-KEM-PrivateKey ::= OCTET STRING (SIZE (64))
+  ML-KEM-PrivateKey ::= OCTET STRING (SIZE (1632 | 2400 | 3168))
+
+  ML-KEM-Seed ::= OCTET STRING (SIZE (64))
+
 ~~~
 
-No additional encoding of the ML-KEM public key value is applied in
-the SubjectPublicKeyInfo field of an X.509 certificate {{RFC5280}}.
-However, whenever it appears outside of a
-certificate, it MAY be encoded as an OCTET STRING.
+No additional encoding of the ML-KEM public key value is applied in the
+SubjectPublicKeyInfo field of an X.509 certificate {{RFC5280}}.  However,
+whenever it appears outside of a SubjectPublicKeyInfo structure (typically
+as part of a certificate), it MAY be encoded as an OCTET STRING.
 
-No additional encoding of the ML-KEM private key value is applied in
-the PrivateKeyInfo field of an Asymmetric Key Package {{RFC5958}}.
-However, whenever it appears outside of an
-Asymmetric Key Package, it MAY be encoded as an OCTET STRING.
+The private key is represented as a DER-encoded OCTET STRING, as
+part of a sequence that contains either the key, the seed, or both.
+
+However, whenever the seed or expanded key appear outside of an Asymmetric Key
+Package, they MAY be encoded as OCTET STRINGs.
 
 # Subject Public Key Fields
 
@@ -261,19 +220,20 @@ encoded using the textual encoding defined in {{?RFC7468}}.
 
 # Private Key Format
 
-In short, an ML-KEM private key is encoded by storing its 64-octet seed in
-the privateKey field as follows.
+In short, an ML-KEM private key is encoded by storing either the expanded key
+or the 64-octet seed, or both in the privateKey field as follows.
 
-{{FIPS203}} specifies two formats for an ML-KEM private key: a 64-octet
-seed and an (expanded) private key, which is referred to as the
-decapsulation key. The expanded private key (and public key)
-is computed from the seed using `ML-KEM.KeyGen_internal(d,z)` (algorithm 16)
-using the first 32 octets as *d* and the remaining 32 octets as *z*.
+{{FIPS203}} specifies the format of ML-KEM private keys, or in KEM-specific
+terms, ML-KEM decapsulation keys. The private and public keys are generated in
+`ML-KEM.KeyGen` (algorithm 19) from a 64-octet random seed, with the aid of an
+underlying deterministic `ML-KEM.KeyGen_internal(d,z)` (algorithm 16).  The
+first 32 bytes of the seed form the *d* value and and the remaining 32 octets
+the *z*.
 
-A keypair is generated by sampling 64 octets uniformly at random
-for the seed (private key)  from a cryptographically secure
-pseudorandom number generator (CSPRNGs). The public key can then
-be computed using `ML-KEM.KeyGen_internal(d,z)` as described earlier.
+The seed is generated by sampling 64 octets uniformly at random from a
+cryptographically secure pseudorandom number generator (CSPRNGs).  The
+decapsulation (private) key and encapsulation (public) key are then computed
+using `ML-KEM.KeyGen_internal(d,z)` as noted above.
 
 "Asymmetric Key Packages" {{!RFC5958}} describes how to encode a private
 key in a structure that both identifies which algorithm the private key
@@ -307,32 +267,70 @@ OneAsymmetricKey is replicated below.
   2021 ASN.1 syntax {{X680}}.
 </aside>
 
-When used in a OneAsymmetricKey type, the privateKey OCTET STRING contains
-the raw octet string encoding of the 64-octet seed. The publicKey field
-SHOULD be omitted because the public key can be computed as noted earlier
-in this section.
+When used in a OneAsymmetricKey type, the privateKey OCTET STRING contains the
+DER encoding of a structure that consists of either the the private
+(decapsulation) key, the 64-octet seed or both as shown below:
+
+~~~
+    PrivateKey ::= SEQUENCE {
+         seed OCTET STRING OPTIONAL,
+         expandedKey [1] IMPLICIT OCTET STRING OPTIONAL,
+    }
+~~~
+
+When encoding just the seed or just the key, the sequence above amounts to
+prepending a short fixed-length prefix in front of each part of the key
+material.  This can, if desired, be easily matched verbatim and removed without
+the aid of a general-purpose ASN.1 parser.
+
+For, example, with ML-KEM-768, the possible encodings are:
+
+~~~
+    -- Just the seed:
+    30 42
+        04 40
+            <64 seed bytes>
+
+    -- Just the decapsulation key
+    30 82 09 64
+        81 82 09 60
+            <2400 expanded key bytes>
+
+    -- Seed and the decapsulation key
+    30 82 09 C6
+        04 40
+            <64 seed bytes>
+        81 82 09 60
+            <2400 expanded key bytes>
+~~~
+
+
+The publicKey field SHOULD be omitted because the public key can be computed as
+noted earlier in this section (and is also represented verbatim in the
+decapsulation private key).
 
 {{example-private}} contains examples for ML-KEM private keys
 encoded using the textual encoding defined in {{?RFC7468}}.
 
 # Implementation Considerations
 
-Though section 7.1 of {{FIPS203}} mentions the potential to save seed values for future expansion, Algorithm 19 does not make the seed values available to a caller for serialization.
-Similarly, the algorithm that expands seed values is not listed as one of the "main algorithms" and features "internal" in the name even though it is clear that it is allowed to be exposed externally for the purposes of expanding a key from a seed.
-Below are possible ways to extend the APIs defined in {{FIPS203}} to support serialization of seed values as private keys.
-
-To support serialization of seed values as private keys, let Algorithm 19b denote the same procedure as Algorithm 19 in {{FIPS203}} except it returns (ek, dk, d, z) on line 7. Additionally, Algorithm 16 should be promoted to be a "main algorithm" for external use in expanding seed values.
-
-Note also that unlike other private key compression methods in other algorithms, expanding a private key from a seed is a one-way function, meaning that once a full key is expanded from seed and the seed discarded, the seed cannot be re-created even if the full expanded private key is available. For this reason it is RECOMMENDED that implementations retain and export the seed, even when also exporting the expanded key.
+Note that generating a private key from a seed is a one-way function, meaning
+that once a key is generated from a seed and the seed discarded, the seed
+cannot be re-created even if the full expanded private key is available.  For
+this reason, implementations are encouraged to retain and export the seed,
+along with the expanded key.  The ultimate consumer of the key may be
+constrained to import just the seed or just the expanded key, and exporting
+both maximises usability.
 
 # Security Considerations
 
 The Security Considerations section of {{RFC5280}} applies to this
 specification as well.
 
-Protection of the private-key information, i.e., the seed, is vital to
-public-key cryptography.  Disclosure of the private-key material to another
-entity can lead to masquerades.
+Protection of the private-key information, is vital to public-key cryptography.
+Disclosure of the private-key material to another entity can enable an attacker
+to misrepresent their identity or to decrypt intercepted private
+communications.
 
 For ML-KEM specific security considerations refer to
 {{?I-D.sfluhrer-cfrg-ml-kem-security-considerations}}.
@@ -350,22 +348,6 @@ ML-KEM key generation as standardized in {{FIPS203}} has specific
 requirements around randomness generation, described in section 3.3,
 'Randomness generation'.
 
-Key formats have implications on KEM binding properties, initially formalized
-in {{CDM23}}. Per the analysis of the final {{FIPS203}} in {{KEMMY24}}, a
-compliant instantiation of ML-KEM is LEAK-BIND-K-PK-secure and
-LEAK-BIND-K-CT-secure when using the expanded key format, but not
-MAL-BIND-K-PK-secure nor MAL-BIND-K-CT-secure. This means that the computed
-shared secret binds to the encapsulation key used to compute it against a
-malicious adversary that has access to leaked, honestly-generated key
-material but is not capable of manufacturing maliciously generated
-keypairs. This binding to the encapsulation key broadly protects against
-re-encapsulation attacks, but not completely.
-
-Using the 64-byte seed format provides a step up in binding security by
-mitigating an attack enabled by the hash of the public encapsulation key
-stored in the expanded private decapsulation key format, providing
-MAL-BIND-K-CT security and LEAK-BIND-K-PK security.
-
 # IANA Considerations
 
 For the ASN.1 Module in {{asn1}}, IANA is requested to assign an
@@ -374,14 +356,12 @@ Description of "id-mod-x509-ml-kem-2024".  The OID for the module
 should be allocated in the "SMI Security for PKIX Module Identifier"
 registry (1.3.6.1.5.5.7.0).
 
-
 --- back
-
 
 # ASN.1 Module {#asn1}
 
-This appendix includes the ASN.1 module {{X680}} for the ML-KEM.  Note that
-as per {{RFC5280}}, certificates use the Distinguished Encoding Rules; see
+This appendix includes the ASN.1 module {{X680}} for the ML-KEM.  Note that as
+per {{RFC5280}}, certificates use the Distinguished Encoding Rules; see
 {{X690}}. This module imports objects from {{RFC5912}} and {{!RFC9629}}.
 
 ~~~
@@ -450,13 +430,6 @@ The following is an example of a ML-KEM-1024 private key from the same seed.
 ~~~
 {::include ./example/ML-KEM-1024.priv.txt}
 ~~~
-
-<aside markdown="block">
-  NOTE: The private key is the seed and all three examples keys
-  use the same seed; therefore, the private above are the same
-  except for the OID used to represent the ML-KEM algorithm's
-  security strength.
-</aside>
 
 ## Example Public Key {#example-public}
 
